@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Automatic Medicine Dispenser</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Poppins', sans-serif; background-color: #f8f9fa;}
+    .navbar-brand { font-weight: 700; font-size: 1.5rem; color: #0d6efd !important; }
+    .navbar-brand i { margin-right: 10px; }
+    .search-bar { max-width: 600px; width: 100%; }
+    .cart-icon-wrapper { position: relative; cursor: pointer; }
+    #cart-count { position: absolute; top: -10px; right: -15px; font-size: 0.75rem; background-color: red; color: white; border-radius: 50%; padding: 0.2em 0.5em;}
+    .category-sidebar .list-group-item { cursor: pointer; transition: all 0.2s ease-in-out; }
+    .category-sidebar .list-group-item:hover, .category-sidebar .list-group-item.active { background-color: #0d6efd; color: white; border-color: #0d6efd;}
+    .medicine-card { transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; border-radius: 15px; border: 1px solid #e9ecef; }
+    .medicine-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.1);}
+    .medicine-card .card-img-top { width: 120px; height: 120px; object-fit: contain; margin-top: 20px;}
+    .medicine-card .card-body { text-align: center; }
+    .price-tag { font-size: 1.2rem; font-weight: 600; color: #28a745;}
+    .stock-tag { font-size: 0.8rem; color: #6c757d;}
+    .modal-header { background-color: #0d6efd; color: white; }
+    .modal-header .btn-close { filter: invert(1) grayscale(100%) brightness(200%);}
+    #statusModal .modal-body { text-align: center; font-size: 1.5rem; padding: 40px;}
+    #status-icon { font-size: 5rem; margin-bottom: 20px;}
+    .bkash-logo { width: 100px; margin-bottom: 1rem;}
+    .quantity-controls { display: flex; align-items: center; gap: 10px;}
+    .quantity-btn { width: 30px; height: 30px; border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer;}
+    .quantity-btn:hover { opacity: 0.8;}
+    .quantity-btn:disabled { opacity: 0.5; cursor: not-allowed;}
+    .cart-item-controls { display: flex; align-items: center; gap: 15px;}
+    .delete-btn { color: #dc3545; border: none; background: none; font-size: 1.2rem; cursor: pointer;}
+    .delete-btn:hover { color: #a71e2a;}
+    #admin-fab { position: fixed; bottom: 30px; right: 30px; z-index: 2000;}
+    #admin-panel { z-index: 3000;}
+  </style>
+</head>
+<body>
+<header class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+    <div class="container">
+        <a class="navbar-brand" href="#"><i class="bi bi-robot"></i> Automatic Medicine Dispenser</a>
+        <div class="mx-auto search-bar">
+            <input type="text" id="search-bar" class="form-control form-control-lg" placeholder="Search for any medicine...">
+        </div>
+        <div id="cart-icon-btn" class="cart-icon-wrapper ms-3" data-bs-toggle="modal" data-bs-target="#cartModal">
+            <i class="bi bi-cart-fill fs-2 text-primary"></i>
+            <span id="cart-count" class="d-none">0</span>
+        </div>
+    </div>
+</header>
+<main class="container mt-4">
+    <div class="row">
+        <aside class="col-lg-3">
+            <div class="category-sidebar p-3 bg-white rounded shadow-sm">
+                <h4 class="mb-3">Categories</h4>
+                <ul class="list-group" id="category-list"></ul>
+            </div>
+        </aside>
+        <section class="col-lg-9">
+            <div id="medicine-grid" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4"></div>
+        </section>
+    </div>
+</main>
+<footer class="bg-dark text-white text-center p-3 mt-5">
+    <p>© 2024 Automatic Medicine Dispenser. All Rights Reserved.</p>
+</footer>
+
+<!-- Modals and Admin Panel are the same as before... (unchanged) -->
+
+<!-- Cart Modal -->
+<div class="modal fade" id="cartModal" tabindex="-1" aria-labelledby="cartModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cartModalLabel"><i class="bi bi-cart-check-fill"></i> Your Shopping Cart</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Medicine</th>
+                            <th>Price</th>
+                            <th>Quantity</th>
+                            <th>Total</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cart-items"></tbody>
+                </table>
+                <div class="text-end">
+                    <h4>Total: <span id="cart-total" class="text-success fw-bold">0.00 TK</span></h4>
+                </div>
+                <div id="empty-cart-message" class="text-center p-4 d-none">
+                    <i class="bi bi-emoji-frown fs-1"></i>
+                    <p>Your cart is empty.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Continue Shopping</button>
+                <button type="button" id="buy-now-btn" class="btn btn-primary" disabled>
+                    <i class="bi bi-bag-check-fill"></i> Buy Now
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Modal and Status Modal -->
+<!-- ... (leave as before, unchanged) ... -->
+
+<!-- ADMIN PANEL MODALS (as before) -->
+
+<!-- ... Admin modals & panel ... -->
+
+<button id="admin-fab" title="Admin Login" class="btn btn-primary rounded-circle"><i class="bi bi-person-lock fs-3"></i></button>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// === API URL ===
+const API_URL = "http://localhost:5000/api/medicines"; // Change if your backend is deployed elsewhere
+
+let medicines = [];
+let cart = [];
+
+// ---- API CALLS ----
+function fetchMedicines() {
+    fetch(API_URL)
+        .then(res => res.json())
+        .then(data => {
+            medicines = data;
+            renderCategories();
+            renderMedicines(medicines);
+            renderCart();
+        });
+}
+
+function addMedicine(med) {
+    fetch(API_URL, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(med)
+    }).then(res => res.json())
+      .then(() => fetchMedicines());
+}
+
+function updateMedicine(id, updates) {
+    fetch(`${API_URL}/${id}`, {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(updates)
+    }).then(res => res.json())
+      .then(() => fetchMedicines());
+}
+
+function deleteMedicine(id) {
+    fetch(`${API_URL}/${id}`, {
+        method: "DELETE"
+    }).then(res => res.json())
+      .then(() => fetchMedicines());
+}
+
+// ---- UI RENDERING ----
+function renderMedicines(medicineList) {
+    const grid = $('#medicine-grid');
+    grid.empty();
+    if (medicineList.length === 0) {
+        grid.html('<div class="col-12 text-center"><p class="fs-4 text-muted">No medicines found.</p></div>');
+        return;
+    }
+    medicineList.forEach(med => {
+        const itemInCart = cart.find(item => item.id === med.id);
+        const cartQuantity = itemInCart ? itemInCart.quantity : 0;
+        const isOutOfStock = med.stock <= 0 || cartQuantity >= med.stock;
+        const card = `
+            <div class="col">
+                <div class="card h-100 medicine-card">
+                    <img src="${med.image}" class="card-img-top mx-auto" alt="${med.name}">
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title">${med.name}</h5>
+                        <p class="card-text text-muted">${med.category}</p>
+                        <div class="mt-auto">
+                            <p class="price-tag mb-1">${med.price.toFixed(2)} TK</p>
+                            <p class="stock-tag mb-2">Stock: <span id="stock-${med.id}">${med.stock}</span></p>
+                            <button class="btn btn-primary add-to-cart-btn" data-id="${med.id}" ${isOutOfStock ? 'disabled' : ''}>
+                                <i class="bi bi-plus-circle-fill"></i> ${isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        grid.append(card);
+    });
+}
+
+function renderCategories() {
+    const categories = ['All Medicines', ...new Set(medicines.map(med => med.category))];
+    const list = $('#category-list');
+    list.empty();
+    categories.forEach((cat, index) => {
+        list.append(`<li class="list-group-item ${index === 0 ? 'active' : ''}" data-category="${cat}">${cat}</li>`);
+    });
+}
+
+function renderCart() {
+    const cartItemsContainer = $('#cart-items');
+    cartItemsContainer.empty();
+    let total = 0;
+    if (cart.length === 0) {
+        $('#empty-cart-message').removeClass('d-none');
+        $('#cart-items').closest('table').addClass('d-none');
+        $('#buy-now-btn').prop('disabled', true);
+    } else {
+        $('#empty-cart-message').addClass('d-none');
+        $('#cart-items').closest('table').removeClass('d-none');
+        $('#buy-now-btn').prop('disabled', false);
+    }
+    cart.forEach(item => {
+        const subtotal = item.price * item.quantity;
+        total += subtotal;
+        const medicine = medicines.find(m => m.id === item.id);
+        const maxQuantity = medicine ? medicine.stock : 0;
+        const row = `
+            <tr>
+                <td>${item.name}</td>
+                <td>${item.price.toFixed(2)} TK</td>
+                <td>
+                    <div class="quantity-controls">
+                        <button class="quantity-btn btn btn-outline-secondary decrease-qty" data-id="${item.id}" ${item.quantity <= 1 ? 'disabled' : ''}>-</button>
+                        <span class="mx-2">${item.quantity}</span>
+                        <button class="quantity-btn btn btn-outline-secondary increase-qty" data-id="${item.id}" ${item.quantity >= maxQuantity ? 'disabled' : ''}>+</button>
+                    </div>
+                </td>
+                <td>${subtotal.toFixed(2)} TK</td>
+                <td>
+                    <button class="delete-btn" data-id="${item.id}" title="Remove item"><i class="bi bi-trash"></i></button>
+                </td>
+            </tr>
+        `;
+        cartItemsContainer.append(row);
+    });
+    $('#cart-total').text(`${total.toFixed(2)} TK`);
+    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+    if(totalItems > 0){
+        $('#cart-count').text(totalItems).removeClass('d-none');
+    } else {
+        $('#cart-count').addClass('d-none');
+    }
+}
+
+// ---- Event Handlers ----
+$(document).ready(function() {
+    fetchMedicines();
+    renderCart();
+
+    $('#medicine-grid').on('click', '.add-to-cart-btn', function() {
+        const medId = $(this).data('id');
+        const medicine = medicines.find(m => m.id === medId);
+        const stockCount = medicine.stock;
+        const itemInCart = cart.find(item => item.id === medId);
+        const cartQuantity = itemInCart ? itemInCart.quantity : 0;
+        if (stockCount > cartQuantity) {
+            if(itemInCart) {
+                itemInCart.quantity++;
+            } else {
+                cart.push({ ...medicine, quantity: 1 });
+            }
+            $(this).removeClass('btn-primary').addClass('btn-success').html('<i class="bi bi-check-circle-fill"></i> Added');
+            const newCartQuantity = cart.find(item => item.id === medId).quantity;
+            if (newCartQuantity >= stockCount) {
+                $(this).prop('disabled', true).html('<i class="bi bi-x-circle-fill"></i> Out of Stock');
+            } else {
+                setTimeout(() => {
+                    $(this).removeClass('btn-success').addClass('btn-primary').html('<i class="bi bi-plus-circle-fill"></i> Add to Cart');
+                }, 1500);
+            }
+        } else {
+            alert('Not enough stock available!');
+        }
+        renderCart();
+    });
+
+    $('#cart-items').on('click', '.increase-qty', function() {
+        const medId = $(this).data('id');
+        const medicine = medicines.find(m => m.id === medId);
+        const itemInCart = cart.find(item => item.id === medId);
+        if (itemInCart && itemInCart.quantity < medicine.stock) {
+            itemInCart.quantity++;
+            renderCart();
+        }
+    });
+
+    $('#cart-items').on('click', '.decrease-qty', function() {
+        const medId = $(this).data('id');
+        const itemInCart = cart.find(item => item.id === medId);
+        if (itemInCart && itemInCart.quantity > 1) {
+            itemInCart.quantity--;
+            renderCart();
+        }
+    });
+
+    $('#cart-items').on('click', '.delete-btn', function() {
+        const medId = $(this).data('id');
+        cart = cart.filter(item => item.id !== medId);
+        renderCart();
+    });
+
+    $('#category-list').on('click', '.list-group-item', function() {
+        $('#category-list .list-group-item').removeClass('active');
+        $(this).addClass('active');
+        const category = $(this).data('category');
+        if (category === 'All Medicines') {
+            renderMedicines(medicines);
+        } else {
+            const filteredMedicines = medicines.filter(med => med.category === category);
+            renderMedicines(filteredMedicines);
+        }
+    });
+
+    $('#search-bar').on('keyup', function() {
+        const searchTerm = $(this).val().toLowerCase();
+        const filteredMedicines = medicines.filter(med => med.name.toLowerCase().includes(searchTerm));
+        renderMedicines(filteredMedicines);
+        $('#category-list .list-group-item').removeClass('active');
+    });
+
+    $('#buy-now-btn').on('click', function() {
+        if (cart.length > 0) {
+            $('#cartModal').modal('hide');
+            $('#paymentModal').modal('show');
+        }
+    });
+ 
+    // ADMIN PANEL LOGIC
+    const ADMIN_SECRET = "admin123";
+    let adminLoggedIn = false;
+
+    $('#admin-fab').click(function() {
+        $('#adminLoginModal').modal('show');
+        $('#admin-password-input').val('');
+        $('#admin-login-error').addClass('d-none');
+    });
+
+    $('#admin-login-btn').click(function() {
+        const pw = $('#admin-password-input').val();
+        if (pw === ADMIN_SECRET) {
+            adminLoggedIn = true;
+            $('#adminLoginModal').modal('hide');
+            showAdminPanel();
+        } else {
+            $('#admin-login-error').removeClass('d-none');
+        }
+    });
+
+    $('#admin-logout-btn').click(function() {
+        adminLoggedIn = false;
+        hideAdminPanel();
+    });
+
+    function showAdminPanel() {
+        $('header').hide();
+        $('main').hide();
+        $('footer').hide();
+        $('#admin-fab').hide();
+        $('#admin-panel').removeClass('d-none');
+        renderAdminMedicineTable();
+    }
+
+    function hideAdminPanel() {
+        $('#admin-panel').addClass('d-none');
+        $('header').show();
+        $('main').show();
+        $('footer').show();
+        $('#admin-fab').show();
+        fetchMedicines();
+        renderCart();
+    }
+
+    function renderAdminMedicineTable() {
+        let html = '';
+        medicines.forEach((med, idx) => {
+            html += `
+                <tr>
+                    <td>${med.name}</td>
+                    <td>${med.category}</td>
+                    <td>
+                        <input type="number" min="1" value="${med.price}" class="form-control admin-price-input" data-id="${med.id}" style="width:80px;">
+                    </td>
+                    <td>
+                        <div class="input-group">
+                            <button class="btn btn-outline-secondary btn-sm admin-dec-stock" data-id="${med.id}">-</button>
+                            <input type="number" min="0" value="${med.stock}" class="form-control text-center admin-stock-input" data-id="${med.id}" style="width:60px;">
+                            <button class="btn btn-outline-secondary btn-sm admin-inc-stock" data-id="${med.id}">+</button>
+                        </div>
+                    </td>
+                    <td><span class="text-muted small">${med.id}</span></td>
+                    <td>
+                        <button class="btn btn-danger btn-sm admin-remove-btn" data-id="${med.id}" title="Remove"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>
+            `;
+        });
+        $('#admin-medicine-table').html(html);
+    }
+
+    $('#admin-medicine-table').on('click', '.admin-inc-stock', function() {
+        const id = $(this).data('id');
+        const medicine = medicines.find(m => m.id === id);
+        updateMedicine(id, { stock: medicine.stock + 1 });
+    });
+
+    $('#admin-medicine-table').on('click', '.admin-dec-stock', function() {
+        const id = $(this).data('id');
+        const medicine = medicines.find(m => m.id === id);
+        if (medicine.stock > 0) updateMedicine(id, { stock: medicine.stock - 1 });
+    });
+
+    $('#admin-medicine-table').on('change', '.admin-stock-input', function() {
+        const id = $(this).data('id');
+        let val = Math.max(0, parseInt($(this).val()) || 0);
+        updateMedicine(id, { stock: val });
+    });
+
+    $('#admin-medicine-table').on('change', '.admin-price-input', function() {
+        const id = $(this).data('id');
+        let val = Math.max(1, parseFloat($(this).val()) || 1);
+        updateMedicine(id, { price: val });
+    });
+
+    $('#admin-medicine-table').on('click', '.admin-remove-btn', function() {
+        const id = $(this).data('id');
+        if (confirm('Remove this item?')) {
+            deleteMedicine(id);
+        }
+    });
+
+    $('#add-medicine-form').submit(function(e) {
+        e.preventDefault();
+        const name = $('#new-med-name').val().trim();
+        const cat = $('#new-med-cat').val().trim();
+        const price = parseFloat($('#new-med-price').val()) || 1;
+        const stock = parseInt($('#new-med-stock').val()) || 1;
+        const image = $('#new-med-image').val().trim() || 'https://i.ibb.co/3kXpYvY/pills-generic.png';
+        const id = 'disp' + (Math.floor(Math.random() * 100000) + 1000);
+        if (!name || !cat) return;
+        addMedicine({ id, name, category: cat, price, stock, image });
+        this.reset();
+    });
+
+    $('#adminLoginModal').on('hidden.bs.modal', function () {
+        $('#admin-login-error').addClass('d-none');
+    });
+
+$(document).on('click', '#confirm-payment-btn', function() {
+    console.log("Confirm Payment clicked!");
+    const bkashNumber = $('#bkash-number').val();
+
+    // Validate bKash number
+    if (bkashNumber.length === 11 && /^\d+$/.test(bkashNumber)) {
+        $('#bkash-error').hide();
+        $('#paymentModal').modal('hide');
+
+        // Show "processing" modal
+        const statusModal = new bootstrap.Modal(document.getElementById('statusModal'));
+        $('#status-icon').html('<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>');
+        $('#status-message').text('Processing payment and dispensing medicine...');
+        $('#close-status-modal-btn').addClass('d-none');
+        statusModal.show();
+
+        // 1. Build update promises (for each item in cart)
+        const updatePromises = cart.map(item => {
+            const medicine = medicines.find(med => med.id === item.id);
+            if (medicine) {
+                return fetch(`${API_URL}/${item.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        // keep other fields same, only update stock!
+                        stock: medicine.stock - item.quantity
+                    })
+                })
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`Failed to update medicine ${medicine.id} (status: ${res.status})`);
+                    }
+                    return res.json();
+                });
+            }
+            return Promise.resolve();
+        });
+
+        // 2. Wait for all updates, then show success
+        Promise.all(updatePromises)
+            .then(() => {
+                // Show success in the modal
+                $('#status-icon').html('<i class="bi bi-check-circle-fill text-success"></i>');
+                $('#status-message').text('Payment successful! Please take your medicine.');
+                $('#close-status-modal-btn').removeClass('d-none');
+
+                // Clear cart and refresh UI
+                cart = [];
+                renderCart();
+                fetchMedicines();
+
+                // Close the modal and refresh the page after 2 seconds
+                setTimeout(function() {
+                    $('#statusModal').modal('hide');
+                    // Optionally reload the site for full reset
+                    location.reload();
+                }, 2000);
+            })
+            .catch((err) => {
+                $('#status-icon').html('<i class="bi bi-x-circle-fill text-danger"></i>');
+                $('#status-message').text('Payment failed. Please try again.');
+                $('#close-status-modal-btn').removeClass('d-none');
+                console.error('Error updating medicines:', err);
+            });
+    } else {
+        $('#bkash-error').show();
+    }
+});
+
+
+
+
+
+});
+
+
+</script>
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="paymentModalLabel"><i class="bi bi-wallet2"></i> Complete Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img src="data:image/png;base64,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" alt="bKash Logo" class="bkash-logo">
+                <h5>Pay with bKash</h5>
+                <p>Enter your bKash number to proceed.</p>
+                <div class="mb-3">
+                    <input type="tel" class="form-control" id="bkash-number" placeholder="e.g., 01700000000">
+                    <div id="bkash-error" class="text-danger mt-1" style="display:none;">Please enter a valid 11-digit number.</div>
+                </div>
+                <button id="confirm-payment-btn" class="btn btn-success w-100">Confirm Payment</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ADMIN LOGIN MODAL -->
+<div class="modal fade" id="adminLoginModal" tabindex="-1" aria-labelledby="adminLoginModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="adminLoginModalLabel"><i class="bi bi-person-lock"></i> Admin Login</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="password" id="admin-password-input" class="form-control" placeholder="Enter admin password">
+        <div id="admin-login-error" class="text-danger mt-2 d-none">Incorrect password!</div>
+        <button id="admin-login-btn" class="btn btn-primary mt-3 w-100">Login</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div id="admin-panel" class="container mt-4 d-none">
+  <div class="card shadow">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+      <h5 class="mb-0"><i class="bi bi-gear-fill"></i> Admin Panel</h5>
+      <button id="admin-logout-btn" class="btn btn-sm btn-light">Logout</button>
+    </div>
+    <div class="card-body">
+      <h6>Add New Medicine</h6>
+      <form id="add-medicine-form" class="row g-2 mb-4">
+        <div class="col-3"><input type="text" class="form-control" id="new-med-name" placeholder="Name" required></div>
+        <div class="col-2"><input type="text" class="form-control" id="new-med-cat" placeholder="Category" required></div>
+        <div class="col-2"><input type="number" class="form-control" id="new-med-price" placeholder="Price" required min="1"></div>
+        <div class="col-2"><input type="number" class="form-control" id="new-med-stock" placeholder="Stock" required min="1"></div>
+        <div class="col-2"><input type="text" class="form-control" id="new-med-image" placeholder="Image URL"></div>
+        <div class="col-1"><button type="submit" class="btn btn-success w-100"><i class="bi bi-plus-circle"></i></button></div>
+      </form>
+      <h6>Manage Medicines</h6>
+      <div class="table-responsive">
+        <table class="table table-bordered align-middle">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Price</th>
+              <th>Stock</th>
+              <th>ID</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="admin-medicine-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="statusModal" ...>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body">
+        <div id="status-icon"></div>
+        <h4 id="status-message"></h4>
+        <button id="close-status-modal-btn" type="button" class="btn btn-primary mt-3 d-none" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
